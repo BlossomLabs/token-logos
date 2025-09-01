@@ -1,9 +1,15 @@
 import { Platform, TokenList } from "./types.ts";
 import { kv, ETAG_KEY, LOGO_KEY, PLATFORMMAP_KEY, REVMAP_KEY } from "./kv.ts";
 import { fetchJSON, fetchWithRetry, setMany, sleep } from "./utils.ts";
-import { supportedChainIds } from "./constants.ts";
 
-async function indexPlatform(platformId: string, chainId: number) {
+export async function indexPlatform(chainId: number) {
+  const chainMap = await kv.get(PLATFORMMAP_KEY) as { value?: Record<string, string> | null };
+  const platformId = chainMap.value?.[chainId];
+  if (!platformId) {
+    console.warn(`Skip ${chainId}: platformId not found`);
+    return;
+  }
+
   const prev = (await kv.get(ETAG_KEY(platformId))) as { value?: string | null };
   const etagPrev = prev.value ?? null;
   const url = `https://tokens.coingecko.com/${platformId}/all.json`;
@@ -63,31 +69,4 @@ export async function updateIndex() {
   }
   await kv.set(PLATFORMMAP_KEY, chainMap);
   await kv.set(REVMAP_KEY, revMap);
-
-  const platformIds = Object.keys(revMap).filter((id) =>
-    supportedChainIds.length === 0 || supportedChainIds.includes(revMap[id])
-  );
-  if (platformIds.length > 10) {
-    console.log(
-      `Indexing ${platformIds.length} platforms: ${platformIds.slice(0, 10).join(", ")}, ...`,
-    );
-  } else {
-    console.log(`Indexing ${platformIds.length} platforms: ${platformIds.join(", ")}`);
-  }
-  const CONCURRENCY = 1;
-  const pending = [...platformIds];
-  const workers = Array.from({ length: CONCURRENCY }).map(async () => {
-    for (;;) {
-      const id = pending.pop();
-      if (!id) break;
-      await indexPlatform(id, revMap[id]);
-      console.log(
-        `Indexed ${String(id).padEnd(20)} ${(100 - (pending.length / platformIds.length * 100)).toFixed(2)}%`,
-      );
-      await sleep(1000);
-    }
-  });
-  await Promise.all(workers);
 }
-
-

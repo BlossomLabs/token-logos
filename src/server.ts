@@ -1,12 +1,27 @@
 import { HEADERS_CORS, nativeTokenLogo } from "./constants.ts";
 import { streamThrough, IDENTICON } from "./utils.ts";
 import { kv, LOGO_KEY } from "./kv.ts";
+import { indexPlatform, updateIndex } from "./indexer.ts";
+
+declare const Deno: any;
+const supportedChainIds = Deno.env.get("SUPPORTED_CHAIN_IDS")?.split(",").map(Number) ?? [];
 
 export const server = async (req: Request) => {
   const { pathname } = new URL(req.url);
   
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: HEADERS_CORS });
+  }
+
+  if (pathname === "/update") {
+    await updateIndex();
+    return new Response("Index updated", { headers: HEADERS_CORS });
+  }
+
+  if (pathname.startsWith("/update/")) {
+    const chainId = Number(pathname.split("/")[2]);
+    await indexPlatform(chainId);
+    return new Response(`Chain ${chainId} indexed`, { headers: HEADERS_CORS });
   }
   
   if (pathname.startsWith("/token/")) {
@@ -43,7 +58,11 @@ export const server = async (req: Request) => {
   if (pathname === "/" || pathname === "/health") {
     return new Response(
       JSON.stringify(
-        { ok: true, routes: ["/token/<chainId>/<address>"], source: "tokens.coingecko.com" },
+        { ok: true, routes: [
+          "/token/<chainId>/<address>",
+          "/update",
+          ...supportedChainIds.map((chainId) => `/update/${chainId}`),
+        ] },
         null,
         2
       ),

@@ -13,16 +13,17 @@
  */
 
 declare const Deno: any;
-import { updateIndex } from "./src/indexer.ts";
+import { indexPlatform, updateIndex } from "./src/indexer.ts";
 import { server } from "./src/server.ts";
-
-await updateIndex();
 
 Deno.serve(server);
 
-Deno.cron("coingecko-indexer", "*/10 * * * *", async () => {
+Deno.cron?.("coingecko-indexer", "*/10 * * * *", async () => {
   try {
     await updateIndex();
+    Deno.env.get("SUPPORTED_CHAIN_IDS")?.split(",").map(Number).forEach(async (chainId) => {
+      await indexPlatform(chainId);
+    });
     console.log("Index updated");
   } catch (e) {
     console.error("Index update failed:", e);
