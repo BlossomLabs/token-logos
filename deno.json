@@ -1,0 +1,11 @@
+{
+  "tasks": {
+    "dev": "deno --allow-net --allow-env --unstable-kv --unstable-cron main.ts"
+  },
+  "imports": {
+    "@std/assert": "jsr:@std/assert@1"
+  },
+  "compilerOptions": {
+    "lib": ["deno.ns", "dom", "deno.unstable"]
+  }
+}
